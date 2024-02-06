@@ -480,12 +480,19 @@ class CheckHardLinks:
         of the remaining files where the file is greater size a percentage of the largest file
         This fixes the bug in #192
         """
-        check_for_hl = True
+        check_for_hl = True # True = no hardlink
         try:
             if os.path.isfile(file):
                 if os.path.islink(file):
-                    logger.warning(f"Symlink found in {file}, unable to determine hardlinks. Skipping...")
-                    return False
+                    oldfile = file
+                    file = os.path.realpath(file)
+                    if not os.path.exists(file):
+                        logger.warning(f"Symlink at {oldfile} points to missing file {file}, unable to determine hardlinks. Skipping...")
+                        return True
+                    # Link points to a file that exists outside of the root dir
+                    if not str(file).replace(self.remote_dir, self.root_dir) in self.root_files:
+                        logger.trace(f"Symlink out of root dir at {str(file).replace(self.remote_dir, self.root_dir)}, marking as hardlinked.")
+                        return False
                 logger.trace(f"Checking file: {file}")
                 logger.trace(f"Checking file inum: {os.stat(file).st_ino}")
                 logger.trace(f"Checking no of hard links: {os.stat(file).st_nlink}")
@@ -511,8 +518,14 @@ class CheckHardLinks:
                     logger.trace(f"Largest file size: {largest_file_size}")
                     for files in sorted_files:
                         if os.path.islink(files):
-                            logger.warning(f"Symlink found in {files}, unable to determine hardlinks. Skipping...")
-                            continue
+                            oldfile = files
+                            files = os.path.realpath(files)
+                            if not os.path.exists(files):
+                                logger.warning(f"Symlink at {oldfile} points to missing file {files}, unable to determine hardlinks. Skipping...")
+                                continue
+                            if not str(files).replace(self.remote_dir, self.root_dir) in self.root_files:
+                                logger.warning(f"Symlink out of root dir at {str(files).replace(self.remote_dir, self.root_dir)} (from dir), marking as hardlinked.")
+                                return False
                         file_size = os.stat(files).st_size
                         file_no_hardlinks = os.stat(files).st_nlink
                         logger.trace(f"Checking file: {files}")

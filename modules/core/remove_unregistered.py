@@ -218,9 +218,9 @@ class RemoveUnregistered:
             "torrent_tracker": tracker["url"],
             "notifiarr_indexer": tracker["notifiarr"],
         }
-        if self.qbt.torrentinfo[self.t_name]["count"] > 1:
+        if self.qbt.torrentinfo[self.t_name]["count"] > 1 or True: # Hack to make this not delete contents
             # Checks if any of the original torrents are working
-            if "" in self.t_msg or 2 in self.t_status:
+            if "" in self.t_msg or 2 in self.t_status or True:
                 attr["torrents_deleted_and_contents"] = False
                 if not self.config.dry_run:
                     self.qbt.tor_delete_recycle(torrent, attr)

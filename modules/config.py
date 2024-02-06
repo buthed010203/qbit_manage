@@ -476,6 +476,16 @@ class Config:
                     do_print=False,
                     save=False,
                 )
+                self.share_limits[group]["ignore_hardlinked"] = self.util.check_for_attribute(
+                    self.data,
+                    "ignore_hardlinked",
+                    parent="share_limits",
+                    subparent=group,
+                    var_type="bool",
+                    default=False,
+                    do_print=False,
+                    save=False,
+                )
                 self.share_limits[group]["torrents"] = []
         else:
             if self.commands["share_limits"]:

@@ -11,7 +11,7 @@ logger = util.logger
 MIN_SEEDING_TIME_TAG = "MinSeedTimeNotReached"
 MIN_NUM_SEEDS_TAG = "MinSeedsNotMet"
 LAST_ACTIVE_TAG = "LastActiveLimitNotReached"
-
+HARDLINK_TAG = "HL"
 
 class ShareLimits:
     def __init__(self, qbit_manager, torrents_to_tag=None, silent=False):
@@ -32,6 +32,7 @@ class ShareLimits:
         self.torrent_hash_checked = []  # list of torrent hashes that have been checked for share limits
         self.share_limits_tag = qbit_manager.config.share_limits_tag  # tag for share limits
         self.group_tag = None  # tag for the share limit group
+        self.nohardlinks_tag = qbit_manager.config.nohardlinks_tag  # tag for torrents with no hardlinks. no point in deleting hardlinked torrents
 
         level = logger._logger.level
         self.silent = silent
@@ -114,7 +115,8 @@ class ShareLimits:
                 }
                 if os.path.exists(torrent["content_path"].replace(self.root_dir, self.remote_dir)):
                     # Checks if any of the original torrents are working
-                    if t_count > 1 and ("" in t_msg or 2 in t_status):
+                    # Just kidding, it deletes shared stuff which is dumb
+                    if (t_count > 1 and ("" in t_msg or 2 in t_status)) or True:
                         self.stats_deleted += 1
                         attr["torrents_deleted_and_contents"] = False
                         t_deleted.add(t_name)
@@ -225,6 +227,7 @@ class ShareLimits:
                     not is_tag_in_torrent(MIN_SEEDING_TIME_TAG, torrent.tags)
                     and not is_tag_in_torrent(MIN_NUM_SEEDS_TAG, torrent.tags)
                     and not is_tag_in_torrent(LAST_ACTIVE_TAG, torrent.tags)
+                    and not is_tag_in_torrent(HARDLINK_TAG, torrent.tags)
                 ):
                     logger.print_line(logger.insert_space(f"Torrent Name: {t_name}", 3), self.config.loglevel)
                     logger.print_line(logger.insert_space(f'Tracker: {tracker["url"]}', 8), self.config.loglevel)
@@ -233,7 +236,6 @@ class ShareLimits:
                     self.tag_and_update_share_limits_for_torrent(torrent, group_config)
                     self.stats_tagged += 1
                     self.torrents_updated.append(t_name)
-
             tor_reached_seed_limit = self.has_reached_seed_limit(
                 torrent=torrent,
                 max_ratio=group_config["max_ratio"],
@@ -243,6 +245,7 @@ class ShareLimits:
                 last_active=group_config["last_active"],
                 resume_torrent=group_config["resume_torrent_after_change"],
                 tracker=tracker["url"],
+                ignore_hardlinked=group_config["ignore_hardlinked"],
             )
             # Cleanup torrents if the torrent meets the criteria for deletion and cleanup is enabled
             if group_config["cleanup"]:
@@ -392,7 +395,7 @@ class ShareLimits:
         return body
 
     def has_reached_seed_limit(
-        self, torrent, max_ratio, max_seeding_time, min_seeding_time, min_num_seeds, last_active, resume_torrent, tracker
+        self, torrent, max_ratio, max_seeding_time, min_seeding_time, min_num_seeds, last_active, resume_torrent, tracker, ignore_hardlinked
     ):
         """Check if torrent has reached seed limit"""
         body = ""
@@ -487,6 +490,23 @@ class ShareLimits:
                             torrent.resume()
             return False
 
+        def _is_hl():  # Fork addition: don't delete torrents with hardlinks
+            print_log = []
+            hl = not is_tag_in_torrent(self.nohardlinks_tag, torrent.tags) and ignore_hardlinked
+            if is_tag_in_torrent(HARDLINK_TAG, torrent.tags):  # Was hardlinked previously
+                if not hl and not self.config.dry_run:
+                    torrent.remove_tags(tags=HARDLINK_TAG)
+            else:  # Was not previously hardlinked
+                if hl:
+                    print_log += logger.print_line(logger.insert_space(f"Torrent Name: {torrent.name}", 3), self.config.loglevel)
+                    print_log += logger.print_line(logger.insert_space("Torrent has hardlinks. Removing Share Limits so qBittorrent can continue seeding.", 8), self.config.loglevel)
+                    if not self.config.dry_run:
+                        torrent.add_tags(HARDLINK_TAG)
+                        torrent.set_share_limits(ratio_limit=-1, seeding_time_limit=-1, inactive_seeding_time_limit=-1)
+                        if resume_torrent:
+                            torrent.resume()
+            return hl
+
         def _has_reached_seeding_time_limit():
             nonlocal body
             seeding_time_limit = None
@@ -508,25 +528,27 @@ class ShareLimits:
                     return True
             return False
 
+        if _is_hl():  # Don't delete hardlinked torrents
+            return False
         if min_num_seeds is not None:
             if _is_less_than_min_num_seeds():
-                return body
+                return body  # Always empty. Effectively False
         if last_active is not None:
             if not _has_reached_last_active_time_limit():
-                return body
+                return body  # Always empty. Effectively False
         if max_ratio is not None:
             if max_ratio >= 0:
                 if torrent.ratio >= max_ratio and _has_reached_min_seeding_time_limit():
                     body += logger.insert_space(f"Ratio vs Max Ratio: {torrent.ratio:.2f} >= {max_ratio:.2f}", 8)
-                    return body
+                    return body  # True
             elif max_ratio == -2 and self.qbt.global_max_ratio_enabled and _has_reached_min_seeding_time_limit():
                 if torrent.ratio >= self.qbt.global_max_ratio:
                     body += logger.insert_space(
                         f"Ratio vs Global Max Ratio: {torrent.ratio:.2f} >= {self.qbt.global_max_ratio:.2f}", 8
                     )
-                    return body
+                    return body  # True
         if _has_reached_seeding_time_limit():
-            return body
+            return body  # True
         return False
 
     def delete_share_limits_suffix_tag(self):
