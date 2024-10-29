@@ -66,16 +66,14 @@ class TorrentMessages:
 
     IGNORE_MSGS = [
         "YOU HAVE REACHED THE CLIENT LIMIT FOR THIS TORRENT",
-        "MISSING PASSKEY",
-        "MISSING INFO_HASH",
-        "PASSKEY IS INVALID",
-        "INVALID PASSKEY",
+        "PASSKEY",  # Any mention of passkeys should be a clear sign it should NOT be deleted
         "EXPECTED VALUE (LIST, DICT, INT OR STRING) IN BENCODED STRING",
         "COULD NOT PARSE BENCODED DATA",
         "STREAM TRUNCATED",
         "GATEWAY TIMEOUT",  # BHD Gateway Timeout
         "ANNOUNCE IS CURRENTLY UNAVAILABLE",  # BHD Announce unavailable
         "TORRENT HAS BEEN POSTPONED",  # BHD Status
+        "520 (UNKNOWN HTTP ERROR)",
     ]
 
     EXCEPTIONS_MSGS = [
