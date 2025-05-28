@@ -64,6 +64,24 @@ class TorrentMessages:
         "TORRENT HAS BEEN DELETED",
     ]
 
+    UNREGISTERED_MSGS_BHD = [
+        "DEAD",
+        "DUPE",
+        "COMPLETE SEASON UPLOADED",
+        "COMPLETE SEASON UPLOADED:",
+        "PROBLEM WITH DESCRIPTION",
+        "PROBLEM WITH FILE",
+        "PROBLEM WITH PACK",
+        "SPECIFICALLY BANNED",
+        "TRUMPED",
+        "OTHER",
+        "TORRENT HAS BEEN DELETED",
+        "NUKED",
+        "SEASON PACK:",
+        "SEASON PACK OUT",
+        "SEASON PACK UPLOADED",
+    ]
+
     IGNORE_MSGS = [
         "YOU HAVE REACHED THE CLIENT LIMIT FOR THIS TORRENT",
         "PASSKEY",  # Any mention of passkeys should be a clear sign it should NOT be deleted
